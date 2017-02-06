@@ -2,6 +2,8 @@ import { Hosts, VMs } from '../db'
 import fs from 'fs';
 import { execShellCmds, uploadFiles } from './ssh'
 
+const subDir = 'etcds';
+
 //get all etcd IPs, etcdIPs
 const fetchEtcd = (name) => {
     return VMs.findAll({ 
@@ -24,6 +26,10 @@ const fetchEtcd = (name) => {
 
             if (!myInst ) {
                 throw new Error(`Can't find "${name}" in etcds`)
+            }
+
+            if (!myInst.Host) {
+                throw new Error(`No host for "${name}"`)
             }
 
             let {Name, IP, Memory, Host} = myInst;
@@ -51,7 +57,7 @@ const fetchEtcd = (name) => {
 const compileSettings = (name) => {
     return fetchEtcd(name).then((settings) => {
         console.log(settings);
-        let output = `workdir/etcds/${name}`
+        let output = `workdir/${subDir}/${name}`
         let initial_etcd_cluster = settings.etcdIPs.map((etcd, i) => {
             return `${etcd.Name}=http://${etcd.IP}:2380`
         }).join(',');
@@ -63,12 +69,14 @@ $vm_name = "${settings.vm_name}"
 $bridge = "${settings.bridge}"
 $initial_etcd_cluster = "${initial_etcd_cluster}"
 `
-        fs.writeFile(output, content, (err) => {
-            if (err) {
-                return console.log(err);
-            }
+        fs.mkdir(`workdir/${subDir}`, (err)=>{ 
+            fs.writeFile(output, content, (err) => {
+                if (err) {
+                    return console.log(err);
+                }
 
-            console.log("The file was saved!");
+                console.log("The file was saved!");
+            });
         });
 
         return settings;
@@ -84,27 +92,27 @@ const startVagrant = (name) => {
     return compileSettings(name)
     .then((settings)=>{
         mySettings = settings;
-        return execShellCmds(mySettings.host, [`mkdir -p workdir/etcds/${name}`, 'ls workdir/etcds'])
+        return execShellCmds(mySettings.host, [`mkdir -p workdir/${subDir}/${name}`, 'ls workdir/${subDir}'])
     })
     .then(()=>{
         let files = [
             {
-                from: `workdir/etcds/${name}`,
-                to: `workdir/etcds/${name}/setting.rb`
+                from: `workdir/${subDir}/${name}`,
+                to: `workdir/${subDir}/${name}/setting.rb`
             },
             {
-                from: `workdir/files/etcd.tmpl.rb`,
-                to: `workdir/etcds/${name}/Vagrantfile`
+                from: `files/etcd.tmpl.rb`,
+                to: `workdir/${subDir}/${name}/Vagrantfile`
             },
             {
-                from: `workdir/files/etcd-cloud-config.yaml`,
-                to: `workdir/etcds/${name}/etcd-cloud-config.yaml`
+                from: `files/etcd-cloud-config.yaml`,
+                to: `workdir/${subDir}/${name}/etcd-cloud-config.yaml`
             },
         ]
         return uploadFiles(mySettings.host, files)
     })
     .then(()=>{
-        return execShellCmds(mySettings.host, [`cd workdir/etcds/${name}`, `Vagrant up`]);
+        return execShellCmds(mySettings.host, [`cd workdir/${subDir}/${name}`, `Vagrant up`]);
     }).catch((ex)=>{
         console.log(ex);
     })

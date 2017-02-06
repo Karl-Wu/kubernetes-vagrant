@@ -92,6 +92,17 @@ type Mutation {
     Who: String!
   ): AddrUsed
 
+  vagrantUP(
+    nodes: [String]
+  ): String
+
+  vagrantHalt(
+    nodes: [String]
+  ): String
+
+  vagrantDestroy(
+    nodes: [String]
+  ): String
 }
 
 schema {

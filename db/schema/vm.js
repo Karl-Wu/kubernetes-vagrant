@@ -13,7 +13,7 @@ const VMs = conn.define('VMs', {
             isIP: true,
         }
     },
-    Memory: { type: Sequelize.INTEGER, default: 512 },
+    Memory: { type: Sequelize.INTEGER, default: 1024 },
     Setting: {
         type: Sequelize.TEXT
     },

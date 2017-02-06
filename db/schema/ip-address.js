@@ -22,7 +22,7 @@ const AddrUseds = conn.define('AddrUseds', {
 
 
 
-AddrUseds.belongsTo(IPv4Pools);
+AddrUseds.belongsTo(IPv4Pools, {onDelete: 'CASCADE'});
 IPv4Pools.hasMany(AddrUseds);
 
 AddrUseds.sync({ force: false }).then(() => {
@@ -75,36 +75,53 @@ IPv4Pools.createPool = (values) => {
 };
 
 IPv4Pools.deletePool = ({Name}) => {
-    IPv4Pools.findOne({where:{Name:Name}}).then((pool)=>{
+    /*IPv4Pools.findOne({where:{Name:Name}}).then((pool)=>{
         return pool.destroy();
-    });
+    });*/
+    return IPv4Pools.destroy({
+        where:{Name:Name}
+    })
 };
 
 IPv4Pools.allocIP = ({Name, Who}) => {
-    return IPv4Pools.findOne({
-        where: { Name: Name },
+
+    return AddrUseds.findOne({
+        where: { Owner: Who },
         include: {
-            model: AddrUseds,
-            as: 'AddrUseds',
+            model: IPv4Pools,
+            where: {Name: Name}
         }
-    }).then((pool) => {
-        var start = pool.StartIP;
-        var end = pool.EndIP;
-        var usedMap = {};
+    }).then((addr) => {
+       if (addr) {
+           return addr
+       }
 
-        pool.AddrUseds.map((ip) => {
-            usedMap[ip.Address] = true;
-        });
-
-        for (var n = start + 1; n < end; n++) {
-            if (!usedMap[n]) {
-                return pool.createAddrUsed({ Address: n, Owner: Who }).then((inst)=>{
-                    return inst;
-                });
+       return IPv4Pools.findOne({
+            where: { Name: Name },
+            include: {
+                model: AddrUseds,
+                as: 'AddrUseds',
             }
-        }
-    }).catch((err) => {
-        console.log(err);
+        })
+        .then((pool) => {
+            var start = pool.StartIP;
+            var end = pool.EndIP;
+            var usedMap = {};
+
+            pool.AddrUseds.map((ip) => {
+                usedMap[ip.Address] = true;
+            });
+
+            for (var n = start + 2; n < end; n++) {  //skip first 2 addresses
+                if (!usedMap[n]) {
+                    return pool.createAddrUsed({ Address: n, Owner: Who }).then((inst)=>{
+                        return inst;
+                    });
+                }
+            }
+        }).catch((err) => {
+            console.log(err);
+        })
     })
 
 };

@@ -1,7 +1,7 @@
 import { Hosts, VMs, IPv4Pools, AddrUseds } from '../db'
 import { Address4 } from 'ip-address';
 
-import { compileSettings, startVagrant } from '../k8s/etcd'
+import { startVagrant, vagrantHalt, vagrantDestroy } from '../k8s/vagrant'
 
 const resolvers = {
     Query: {
@@ -36,7 +36,7 @@ const resolvers = {
         },
         TestEntry: (root, args) => {
 
-            return startVagrant('vm3');
+            //return startVagrant('vm5');
         }
     },
     Mutation: {
@@ -68,6 +68,19 @@ const resolvers = {
         allocIP: (root, args) => {
             console.log(args);
             return IPv4Pools.allocIP(args);
+        },
+        vagrantUP: (root, args) => {
+            console.log(args);
+            return startVagrant(args.nodes);
+        },
+        vagrantHalt: (root, args) => {
+            console.log(args);
+            return vagrantHalt(args.nodes);
+        },
+
+        vagrantDestroy: (root, args) => {
+            console.log(args);
+            return vagrantDestroy(args.nodes);
         },
     },
     VM: {
