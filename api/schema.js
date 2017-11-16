@@ -17,11 +17,33 @@ type VM {
     Host: Host 
 }
 
+type AddressOwner {
+    Cluster: String
+    Name: String
+    Type: String
+}
+
+input AddressOwnerInput {
+    Cluster: String
+    Name: String
+    Type: String
+}
+
+type Cluster {
+    id: String
+    Name: String
+    PODNet: String
+    ServiceNet: String
+    K8sIP: String
+    DNSIP: String
+    Nodes: [VM]
+}
+
 type AddrUsed {
     id: String
     createdAt: String
     Address: String
-    Owner: String
+    Owner: AddressOwner
 }
 
 type IPv4Pool {
@@ -37,9 +59,12 @@ type IPv4Pool {
 type Query {
     hosts(Host: String, IP: String): [Host]
     
-    VMs(id: String,Name: String,IP: String): [VM]
+    VMs(clusterId: String!, id: String, Name: String, IP: String): [VM]
+
+    Clusters(id: String, Name: String):[Cluster]
 
     IPv4Pools(id: String,Name: String): [IPv4Pool]
+
     TestEntry(name: String): String
 }
 
@@ -51,19 +76,43 @@ type Mutation {
     Status: String
   ): Host
   
-  createVM (
+  upsertHost (
+    id: String!
+    Host: String
+    IP: String
+    User: String
+    Status: String
+  ): Host
+
+  upsertCluster(
+    id: String
+    Name: String
+    PODNet: String
+    ServiceNet: String
+    K8sIP: String
+    DNSIP: String
+  ): Cluster
+
+  destroyCluster(
+    id: String
+    Name: String
+  ): String
+
+  upsertVM (
+    ClusterId: String!
     Name: String!
     Type: String!
     Memory: Int
     IP: String!
+    HostId: String
   ): VM
 
   destroyVM (
-    Name: String!
+    id: String!
   ): String
 
   deployVM (
-    Name: String!
+    id: String!
     Host: String!
   ): String
 
@@ -89,18 +138,26 @@ type Mutation {
 
   allocIP(
     Name: String!
-    Who: String!
+    Who: AddressOwnerInput
   ): AddrUsed
 
+  releaseIP(
+    Name: String!
+    Address: String!
+  ): String
+
   vagrantUP(
+    cluster:String!
     nodes: [String]
   ): String
 
   vagrantHalt(
+    cluster:String!
     nodes: [String]
   ): String
 
   vagrantDestroy(
+    cluster:String!
     nodes: [String]
   ): String
 }

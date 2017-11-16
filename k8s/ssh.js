@@ -90,6 +90,7 @@ const execShellCmds = (host, cmds) => {
             function(name, instructions, instructionsLang, prompts, finish) {
             // Pass answers to `prompts` to `finish()`. Typically `prompts.length === 1`
             // with `prompts[0] === "Password: "`
+            console.log(name, instructions, instructionsLang, prompts, finish);
             finish([host.pass]);
         })
 

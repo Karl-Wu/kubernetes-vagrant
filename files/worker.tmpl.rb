@@ -9,11 +9,10 @@ require 'yaml'
 Vagrant.require_version ">= 1.6.0"
 $update_channel = "alpha"
 
-worker_CLUSTER_IP="10.3.0.1"  # ???
-
 load "setting.rb"
 
 WORKER_CLOUD_CONFIG_PATH = File.expand_path("./generic/worker-install.sh")
+OPTIONS_PATH = File.expand_path("./options.env.yaml")
 
 controllerIP = $controllerIPs[0] # LB or DNS across control nodes
 
@@ -63,7 +62,9 @@ Vagrant.configure("2") do |config|
 
     config.vm.define vm_name = $vm_name do |worker|
 
+        options = YAML.load(IO.readlines(OPTIONS_PATH)[1..-1].join)
         env_file = Tempfile.new('env_file', :binmode => true)
+        options.map { |k, v| env_file.write("%s=%s\n"%[k, v]) }
         env_file.write("ETCD_ENDPOINTS=#{etcd_endpoints}\n")
         env_file.write("CONTROLLER_ENDPOINT=https://#{controllerIP}\n") #TODO(aaron): LB or DNS across control nodes
         env_file.close

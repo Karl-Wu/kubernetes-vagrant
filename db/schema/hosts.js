@@ -2,7 +2,7 @@ const conn = require('../connector').default;
 import Sequelize from 'sequelize';
 
 const Hosts = conn.define('Hosts', {
-    //id: { type: Sequelize.STRING, primaryKey: true },
+    id: { type: Sequelize.STRING, primaryKey: true },
     Host: { type: Sequelize.STRING, allowNull: false, defaultValue: '' },
     IP: { type: Sequelize.STRING, allowNull: false },
     User: { type: Sequelize.STRING, allowNull: false },

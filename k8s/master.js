@@ -4,10 +4,14 @@ import { execShellCmds, uploadFiles } from './ssh'
 import { genMachineSSL } from './ssl'
 
 const subDir = 'masters';
+const destDir = (cname, name) => {
+    return `workdir/${cname}/${subDir}/${name}`
+}
 
-const fetchMaster = (name) => {
+
+const fetchMaster = ({cname, name, cid}) => {
     return VMs.findAll({
-        where: { Type: { $in: ['master', 'etcd'] } },
+        where: { Type: { $in: ['master', 'etcd'] }, ClusterId: cid },
         include: {
             model: Hosts,
             as: 'Host',
@@ -66,10 +70,10 @@ const fetchMaster = (name) => {
 }
 
 
-const compileSettings = (settings) => {
+const compileSettings = (cname, settings) => {
     return new Promise((resolve, reject) => {
         console.log(settings);
-        let output = `workdir/${subDir}/${settings.vm_name}`
+        let output = `workdir/${cname}/setting.${settings.vm_name}`
         let etcd_endpoints = settings.etcdIPs.map((etcd, i) => {
             return `http://${etcd.IP}:2379`
         }).join(',');
@@ -86,7 +90,7 @@ $bridge = "${settings.bridge}"
 $etcd_endpoints = "${etcd_endpoints}"
 $controllerIPs = "${controllerIPs}"
 `
-        fs.mkdir(`workdir/${subDir}`, (err)=>{
+        fs.mkdir(`workdir/${cname}`, (err)=>{
             fs.writeFile(output, content, (err) => {
                 if (err) {
                     console.log(err);
@@ -102,48 +106,54 @@ $controllerIPs = "${controllerIPs}"
     });
 }
 
-const startVagrant = (name) => {
+const startVagrant = ({cname, name, cid, K8sIP}) => {
     var mySettings;
     //create the setting file
-    return fetchMaster(name)
+    return fetchMaster({cname, name, cid})
         .then((settings) => {
             mySettings = settings;
-            return compileSettings(mySettings)
+            return compileSettings(cname, mySettings)
         })
         .then((settings) => {
             let controllerIPs = mySettings.controllerIPs.map((ctrl, i) => {
                 return ctrl.IP
             });
-            return genMachineSSL("apiserver", `kube-apiserver-${mySettings.myIP}`, controllerIPs)
+            controllerIPs.push(K8sIP);
+            
+            return genMachineSSL(cname, "apiserver", `kube-apiserver-${mySettings.myIP}`, controllerIPs)
         })
         .then(() => {
             return execShellCmds(mySettings.host, 
-            [`mkdir -p workdir/${subDir}/${name}`, `mkdir -p workdir/${subDir}/${name}/generic`, 
-            `mkdir -p workdir/${subDir}/${name}/ssl`, `ls workdir/${subDir}`])
+            [`mkdir -p ${destDir(cname, name)}`, `mkdir -p ${destDir(cname, name)}/generic`, 
+            `mkdir -p ${destDir(cname, name)}/ssl`, `ls ${destDir(cname, name)}`])
         })
         .then(() => {
             let files = [
                 {
-                    from: `workdir/${subDir}/${name}`,
-                    to: `workdir/${subDir}/${name}/setting.rb`
+                    from: `workdir/${cname}/setting.${mySettings.vm_name}`,
+                    to: `${destDir(cname, name)}/setting.rb`
+                },
+                {
+                    from: `workdir/${cname}/options.env.yaml`,
+                    to: `${destDir(cname, name)}/options.env.yaml`
                 },
                 {
                     from: `files/master.tmpl.rb`,
-                    to: `workdir/${subDir}/${name}/Vagrantfile`
+                    to: `${destDir(cname, name)}/Vagrantfile`
                 },
                 {
                     from: `files/controller-install.sh`,
-                    to: `workdir/${subDir}/${name}/generic/controller-install.sh`
+                    to: `${destDir(cname, name)}/generic/controller-install.sh`
                 },
                 {
-                    from: `workdir/ssl/kube-apiserver-${mySettings.myIP}.tar`,
-                    to: `workdir/${subDir}/${name}/ssl/kube-apiserver-${mySettings.myIP}.tar`
+                    from: `workdir/${cname}/ssl/kube-apiserver-${mySettings.myIP}.tar`,
+                    to: `${destDir(cname, name)}/ssl/kube-apiserver-${mySettings.myIP}.tar`
                 },
             ]
             return uploadFiles(mySettings.host, files)
         })
         .then(() => {
-            return execShellCmds(mySettings.host, [`cd workdir/${subDir}/${name}`, `Vagrant up`]);
+            return execShellCmds(mySettings.host, [`cd ${destDir(cname, name)}`, `Vagrant up`]);
         }).catch((ex) => {
             console.log(ex);
         })

@@ -17,7 +17,7 @@ const IPv4Pools = conn.define('IPv4Pools', {
 
 const AddrUseds = conn.define('AddrUseds', {
     Address: { type: Sequelize.INTEGER, unique: true },
-    Owner: { type: Sequelize.TEXT },
+    Owner: { type: Sequelize.TEXT },  //a json 
 });
 
 
@@ -84,9 +84,9 @@ IPv4Pools.deletePool = ({Name}) => {
 };
 
 IPv4Pools.allocIP = ({Name, Who}) => {
-
+    let whoInStr = JSON.stringify(Who);
     return AddrUseds.findOne({
-        where: { Owner: Who },
+        where: { Owner: whoInStr },
         include: {
             model: IPv4Pools,
             where: {Name: Name}
@@ -114,7 +114,7 @@ IPv4Pools.allocIP = ({Name, Who}) => {
 
             for (var n = start + 2; n < end; n++) {  //skip first 2 addresses
                 if (!usedMap[n]) {
-                    return pool.createAddrUsed({ Address: n, Owner: Who }).then((inst)=>{
+                    return pool.createAddrUsed({ Address: n, Owner: whoInStr }).then((inst)=>{
                         return inst;
                     });
                 }
@@ -125,6 +125,24 @@ IPv4Pools.allocIP = ({Name, Who}) => {
     })
 
 };
+
+// address is format 'x.x.x.x'
+IPv4Pools.releaseIP = ({Name, Address}) => {
+    let ip = new ipAddr.Address4(Address);
+    let nAddress = v4AddrArraytoInt(ip.startAddress().toArray());
+
+    return IPv4Pools.findOne({
+        where: { Name: Name }
+    })
+    .then((pool) => {
+        return AddrUseds.destroy({
+            where: { 
+                Address: nAddress,
+                IPv4PoolId: pool.id
+            },
+        })
+    })
+}
 
 export { IPv4Pools, AddrUseds };
 

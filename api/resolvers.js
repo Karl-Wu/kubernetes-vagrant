@@ -1,4 +1,4 @@
-import { Hosts, VMs, IPv4Pools, AddrUseds } from '../db'
+import { Hosts, VMs, IPv4Pools, AddrUseds, Clusters } from '../db'
 import { Address4 } from 'ip-address';
 
 import { startVagrant, vagrantHalt, vagrantDestroy } from '../k8s/vagrant'
@@ -10,6 +10,9 @@ const resolvers = {
                 return Hosts.findAll();
             }
             return Hosts.findAll({ where: args });
+        },
+        Clusters: (root, args) => {
+            return Clusters.findAll({ where: args });
         },
         VMs: (root, args) => {
             console.log(args);
@@ -43,20 +46,35 @@ const resolvers = {
         createHost: (root, args) => {
             return Hosts.create(args);
         },
-        createVM: (root, args) => {
-            return VMs.create(args);
+
+        upsertHost: (root, args) => {
+            return Hosts.upsert(args)
         },
+
+
+        upsertCluster: (root, args) => {
+            return Clusters.upsert(args)
+        },
+
+        destroyCluster: (root, args) => {
+            return Clusters.destroy({ where: { $or:{ Name: args.Name, id: args.id} }});
+        },
+        
+        upsertVM: (root, args) => {
+            return VMs.upsert(args);
+        },
+
         deployVM: (root, args) => {
-            Hosts.findOne({ where: { Host: args.Host } }).then((host) => {
+            /*Hosts.findOne({ where: { Host: args.Host } }).then((host) => {
                 console.log(args, host);
                 return VMs.update({ HostId: host.id }, { where: { Name: args.Name } });
-            });
+            });*/
+            return VMs.upsert(args);
         },
         destroyVM: (root, args) => {
-            return VMs.findOne({ where: { Name: args.Name } }).then((vm) => {
-                vm.destroy();
-            });
+            return VMs.destroy({ where: { id: args.id } });
         },
+        
         createIPv4Pool: (root, args) => {
             console.log(args);
             return IPv4Pools.createPool(args);
@@ -69,18 +87,22 @@ const resolvers = {
             console.log(args);
             return IPv4Pools.allocIP(args);
         },
+        releaseIP: (root, args) => {
+            console.log(args);
+            return IPv4Pools.releaseIP(args)
+        },
         vagrantUP: (root, args) => {
             console.log(args);
-            return startVagrant(args.nodes);
+            return startVagrant(args);
         },
         vagrantHalt: (root, args) => {
             console.log(args);
-            return vagrantHalt(args.nodes);
+            return vagrantHalt(args);
         },
 
         vagrantDestroy: (root, args) => {
             console.log(args);
-            return vagrantDestroy(args.nodes);
+            return vagrantDestroy(args);
         },
     },
     VM: {
@@ -88,10 +110,20 @@ const resolvers = {
             return Hosts.findOne({ where: { id: vm.HostId } })
         }
     },
+    Cluster: {
+        Nodes: (c) => {
+            return VMs.findAll({ where: { ClusterId: c.id } })
+        }
+    },
+
     AddrUsed: {
         Address: (item) => {
             var ip = new Address4.fromInteger(item.Address);
             return ip.correctForm();
+        }, 
+        Owner: (item) => {
+            return JSON.parse(item.Owner)
+            //return VMs.findOne({ where: { Name: item.Owner } })
         }
     }
 };
